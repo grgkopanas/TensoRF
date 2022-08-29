@@ -1,7 +1,7 @@
 
 dataset_name = blender
-datadir = ./data/nerf_synthetic/lego
-expname =  tensorf_lego_VM
+datadir = F:/gkopanas/active_sample_selection/scenes/nerf_synthetic/room_lego
+expname =  lego_room_
 basedir = ./log
 
 n_iters = 30000
@@ -13,7 +13,7 @@ upsamp_list = [2000,3000,4000,5500,7000]
 update_AlphaMask_list = [2000,4000]
 
 N_vis = 5
-vis_every = 10000
+vis_every = 1000
 
 render_test = 1
 

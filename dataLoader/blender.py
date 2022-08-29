@@ -5,10 +5,28 @@ from tqdm import tqdm
 import os
 from PIL import Image
 from torchvision import transforms as T
-
+from torch import nn
 
 from .ray_utils import *
 
+class Sobel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.filter = nn.Conv2d(in_channels=1, out_channels=2, kernel_size=3, stride=1, padding=1, padding_mode='replicate', bias=False)
+
+        Gx = torch.tensor([[2.0, 0.0, -2.0], [4.0, 0.0, -4.0], [2.0, 0.0, -2.0]])
+        Gy = torch.tensor([[2.0, 4.0, 2.0], [0.0, 0.0, 0.0], [-2.0, -4.0, -2.0]])
+        G = torch.cat([Gx.unsqueeze(0), Gy.unsqueeze(0)], 0)
+        G = G.unsqueeze(1)
+        self.filter.weight = nn.Parameter(G, requires_grad=False)
+
+    def forward(self, imgs):
+        imgs = imgs.mean(dim=3).unsqueeze(1)
+        x = self.filter(imgs)
+        x = torch.mul(x, x)
+        x = torch.sum(x, dim=1, keepdim=True)
+        x = torch.sqrt(x)
+        return x
 
 class BlenderDataset(Dataset):
     def __init__(self, datadir, split='train', downsample=1.0, is_stack=False, N_vis=-1):
@@ -55,9 +73,10 @@ class BlenderDataset(Dataset):
         self.poses = []
         self.all_rays = []
         self.all_rgbs = []
+        self.all_grads = []
         self.all_masks = []
         self.all_depth = []
-        self.downsample=1.0
+        self.downsample = 1.0
 
         img_eval_interval = 1 if self.N_vis < 0 else len(self.meta['frames']) // self.N_vis
         idxs = list(range(0, len(self.meta['frames']), img_eval_interval))
@@ -75,9 +94,15 @@ class BlenderDataset(Dataset):
             if self.downsample!=1.0:
                 img = img.resize(self.img_wh, Image.LANCZOS)
             img = self.transform(img)  # (4, h, w)
-            img = img.view(4, -1).permute(1, 0)  # (h*w, 4) RGBA
-            img = img[:, :3] * img[:, -1:] + (1 - img[:, -1:])  # blend A to RGB
+            img = img[:3, :, :] * img[-1:, :, :] + (1 - img[-1:, :, :])  # blend A to RGB
+            img = img.unsqueeze(0).permute(0, 2, 3, 1)
+            grad = Sobel()(img)
+
+            img = img.view(-1, 3)
+            grad = grad.view(-1, 1)
+
             self.all_rgbs += [img]
+            self.all_grads += [grad]
 
 
             rays_o, rays_d = get_rays(self.directions, c2w)  # both (h*w, 3)
@@ -86,8 +111,9 @@ class BlenderDataset(Dataset):
 
         self.poses = torch.stack(self.poses)
         if not self.is_stack:
-            self.all_rays = torch.cat(self.all_rays, 0)  # (len(self.meta['frames])*h*w, 3)
-            self.all_rgbs = torch.cat(self.all_rgbs, 0)  # (len(self.meta['frames])*h*w, 3)
+            self.all_rays = torch.stack(self.all_rays, 0)  # (len(self.meta['frames])*h*w, 3)
+            self.all_rgbs = torch.stack(self.all_rgbs, 0)  # (len(self.meta['frames])*h*w, 3)
+            self.all_grads = torch.stack(self.all_grads, 0)
 
 #             self.all_depth = torch.cat(self.all_depth, 0)  # (len(self.meta['frames])*h*w, 3)
         else:

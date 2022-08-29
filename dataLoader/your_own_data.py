@@ -20,7 +20,7 @@ class YourOwnDataset(Dataset):
         self.downsample = downsample
         self.define_transforms()
 
-        self.scene_bbox = torch.tensor([[-1.5, -1.5, -1.5], [1.5, 1.5, 1.5]])
+        self.scene_bbox = torch.tensor([[-16.0, -16.0, -16.0], [16.0, 16.0, 16.0]])
         self.blender2opencv = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
         self.read_meta()
         self.define_proj_mat()
@@ -59,7 +59,7 @@ class YourOwnDataset(Dataset):
         self.all_rgbs = []
         self.all_masks = []
         self.all_depth = []
-
+        self.world_o = []
 
         img_eval_interval = 1 if self.N_vis < 0 else len(self.meta['frames']) // self.N_vis
         idxs = list(range(0, len(self.meta['frames']), img_eval_interval))
@@ -82,12 +82,13 @@ class YourOwnDataset(Dataset):
                 img = img[:, :3] * img[:, -1:] + (1 - img[:, -1:])  # blend A to RGB
             self.all_rgbs += [img]
 
-
+            self.world_o += [c2w[:3, 3]]
             rays_o, rays_d = get_rays(self.directions, c2w)  # both (h*w, 3)
             self.all_rays += [torch.cat([rays_o, rays_d], 1)]  # (h*w, 6)
 
 
         self.poses = torch.stack(self.poses)
+        self.world_o = torch.stack(self.world_o)
         if not self.is_stack:
             self.all_rays = torch.cat(self.all_rays, 0)  # (len(self.meta['frames])*h*w, 3)
             self.all_rgbs = torch.cat(self.all_rgbs, 0)  # (len(self.meta['frames])*h*w, 3)

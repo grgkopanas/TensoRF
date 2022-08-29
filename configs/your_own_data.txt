@@ -1,7 +1,7 @@
 
 dataset_name = own_data
-datadir = ./data/xxx
-expname =  tensorf_xxx_VM
+datadir = F:/gkopanas/active_sample_selection/scenes/nerf_synthetic/room_lego_quarter_biased2
+expname =  fixed/room_lego_quarter_biased2_voronoip
 basedir = ./log
 
 n_iters = 30000
@@ -12,8 +12,8 @@ N_voxel_final = 27000000 # 300**3
 upsamp_list = [2000,3000,4000,5500,7000]
 update_AlphaMask_list = [2000,4000]
 
-N_vis = 5
-vis_every = 10000
+N_vis = 15
+vis_every = 5000
 
 render_test = 1
 
